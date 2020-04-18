@@ -1,0 +1,9 @@
+name: systemd
+version: 0.1.0
+
+authors:
+  - Carl Hörberg <carl.hoerberg@gmail.com>
+
+crystal: 0.34.0
+
+license: MIT
