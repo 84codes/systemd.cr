@@ -3,7 +3,9 @@
 libsystemd wrapper for Crystal.
 
 Detailed information:
+
 http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
+
 http://man7.org/linux/man-pages/man3/sd_listen_fds_with_names.3.html
 
 No-op for non Linux systems.
