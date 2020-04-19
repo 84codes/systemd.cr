@@ -1,8 +1,9 @@
 name: systemd
-version: 0.1.0
+version: 1.0.0
+description: Wrapper for libsystemd
 
 authors:
-  - Carl Hörberg <carl.hoerberg@gmail.com>
+  - Carl Hörberg <carl@84codes.com>
 
 crystal: 0.34.0
 
