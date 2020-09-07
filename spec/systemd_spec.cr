@@ -20,4 +20,9 @@ describe SystemD do
     ENV["LISTEN_FDNAMES"] = "echo.socket:stored"
     SystemD.listen_fds_with_names.should eq [{ 3, "echo.socket" }, { 4, "stored" }]
   end
+
+  it "can log" do
+    Log.builder.bind("*", :debug, SystemD::JournalD.new)
+    Log.info { "foobar" }
+  end
 end
