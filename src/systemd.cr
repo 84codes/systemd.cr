@@ -3,7 +3,7 @@ require "./libsystemd"
 # Wrapper for libsystemd
 # http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
 # http://man7.org/linux/man-pages/man3/sd_listen_fds_with_names.3.html
-class SystemD
+module SystemD
   LISTEN_FDS_START = LibSystemD::SD_LISTEN_FDS_START
 
   def self.notify_ready
