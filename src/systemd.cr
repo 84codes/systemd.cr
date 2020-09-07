@@ -50,18 +50,18 @@ module SystemD
 
   def self.listen_fds_with_names
     {% if flag?(:linux) %}
-    val = Pointer(UInt8).null
-    arr = pointerof(val)
-    fds = LibSystemD.sd_listen_fds_with_names(0, pointerof(arr))
-    raise Error.new if fds < 0
-    names = Array(Tuple(Int32, String)).new(fds) do |i|
-      ptr = (arr + i).value
-      name = String.new(ptr)
-      LibC.free ptr
-      { i + LISTEN_FDS_START, name }
-    end
-    LibC.free arr
-    names
+      val = Pointer(UInt8).null
+      arr = pointerof(val)
+      fds = LibSystemD.sd_listen_fds_with_names(0, pointerof(arr))
+      raise Error.new if fds < 0
+      names = Array(Tuple(Int32, String)).new(fds) do |i|
+        ptr = (arr + i).value
+        name = String.new(ptr)
+        LibC.free ptr
+        { i + LISTEN_FDS_START, name }
+      end
+      LibC.free arr
+      names
     {% else %}
       Array(Tuple(Int32, String)).new(0)
     {% end %}
@@ -71,7 +71,6 @@ module SystemD
     {% if flag?(:linux) %}
       LibSystemD.sd_pid_notify_with_fds(0, 0, "FDSTORE=1\n",
                                         fds.to_unsafe, fds.size).tap do |ret|
-
         if ret < 0
           raise Error.new
         end
