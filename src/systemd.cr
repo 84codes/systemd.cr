@@ -14,6 +14,10 @@ class SystemD
     self.notify("STOPPING=1\n")
   end
 
+  def self.notify_reloading
+    self.notify("RELOADING=1\n")
+  end
+
   def self.notify_status(status : String)
     self.notify("STATUS=#{status}\n")
   end
