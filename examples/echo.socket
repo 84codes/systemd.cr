@@ -1,0 +1,8 @@
+[Socket]
+ListenStream=1234
+ListenStream=1235
+Backlog=512
+DeferAcceptSec=5
+
+[Install] 
+WantedBy=sockets.target

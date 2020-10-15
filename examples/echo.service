@@ -1,0 +1,4 @@
+[Service]
+ExecStart=/home/carl/code/systemd.cr/echo
+Type=notify
+FileDescriptorStoreMax=infinity
