@@ -60,7 +60,7 @@ module SystemD
         LibC.free ptr
         { i + LISTEN_FDS_START, name }
       end
-      LibC.free arr
+      LibC.free arr if fds > 0
       names
     {% else %}
       Array(Tuple(Int32, String)).new(0)
