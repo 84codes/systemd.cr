@@ -5,7 +5,10 @@ describe SystemD do
     ENV["NOTIFY_SOCKET"] = path = File.tempname
     sock = Socket.unix(Socket::Type::DGRAM)
     sock.bind Socket::UNIXAddress.new(path)
-    SystemD.notify_ready.should eq 1
+    SystemD.notify_ready.should be_true
+    # bug in crystal 0.35.1 doesn't allow receiving dgrams over unix socket
+    # message, _ = sock.receive
+    # message.should eq "READY=1\n"
     sock.close
     File.delete path
   end
@@ -19,5 +22,24 @@ describe SystemD do
     ENV["LISTEN_FDS"] = "2"
     ENV["LISTEN_FDNAMES"] = "echo.socket:stored"
     SystemD.listen_fds_with_names.should eq [{ 3, "echo.socket" }, { 4, "stored" }]
+  end
+
+  it "can identify tcp listerner sockets" do
+    TCPServer.open("localhost", 0) do |s|
+      SystemD.is_unix_stream_listener?(s.fd).should be_false
+      SystemD.is_tcp_socket?(s.fd).should be_false
+      SystemD.is_tcp_listener?(s.fd).should be_true
+    end
+  end
+
+  it "can identify tcp sockets" do
+    TCPServer.open("localhost", 0) do |s|
+      port = s.local_address.port
+      TCPSocket.open("localhost", port) do |c|
+        SystemD.is_tcp_listener?(c.fd).should be_false
+        SystemD.is_unix_stream_socket?(c.fd).should be_false
+        SystemD.is_tcp_socket?(c.fd).should be_true
+      end
+    end
   end
 end

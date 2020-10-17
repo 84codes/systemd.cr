@@ -11,5 +11,6 @@ lib LibSystemD
     fun sd_notify(unset_environment : Int, state : Char*) : Int
     fun sd_pid_notify(pid : PidT, unset_environment : Int, state : Char*) : Int
     fun sd_pid_notify_with_fds(pid : PidT, unset_environment : Int, state : Char*, fds : Void*, n_fds : UInt) : Int
+    fun sd_is_socket(fd : Int, family : Int, type : Int, listening : Int) : Int
   {% end %}
 end
