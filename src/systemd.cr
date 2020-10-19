@@ -69,13 +69,8 @@ module SystemD
     {% if flag?(:linux) %}
       case LibSystemD.sd_pid_notify_with_fds(0, 0, "FDSTORE=1\n",
                                              fds.to_unsafe, fds.size)
-      when 1
-        true
-      when 0
-        false
-      when -1
-        raise Error.new
-      end
+      raise Error.new if res < 0
+      res > 0
     {% else %}
       false
     {% end %}
@@ -84,7 +79,7 @@ module SystemD
   def self.store_fds(fds : Array(Int32), name : String) : Bool
     {% if flag?(:linux) %}
       res = LibSystemD.sd_pid_notify_with_fds(0, 0,
-                                              "FDSTORE=1\nFDNAME=#{fd_name}\n",
+                                              "FDSTORE=1\nFDNAME=#{name}\n",
                                               fds.to_unsafe, fds.size)
       raise Error.new if res < 0
       res > 0
