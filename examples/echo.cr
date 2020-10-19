@@ -17,10 +17,19 @@ rescue IO::Error
   CLIENTS.delete(client)
 end
 
-CLIENTS = Array(TCPSocket).new
+CLIENTS = Array(Socket).new
 
 def server(fd)
-  server = TCPServer.new(fd: fd)
+  server =
+    case
+    when SystemD.is_tcp_listener?(fd)
+      TCPServer.new(fd: fd)
+    when SystemD.is_unix_stream_listener?(fd)
+      UNIXServer.new(fd: fd)
+    else
+      raise "invalid socket type"
+    end
+
   while client = server.accept?
     CLIENTS << client
     spawn handle_client(client)
@@ -37,7 +46,15 @@ SystemD.listen_fds_with_names.each do |fd, name|
   when /\.socket$/
     spawn server(fd)
   else
-    client = TCPSocket.new(fd: fd)
+    client =
+      case
+      when SystemD.is_tcp_socket?(fd)
+        TCPSocket.new(fd: fd)
+      when SystemD.is_unix_stream_socket?(fd)
+        UNIXSocket.new(fd: fd)
+      else
+        raise "unknown socket type"
+      end
     CLIENTS << client
     spawn handle_client(client)
   end
