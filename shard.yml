@@ -5,6 +5,6 @@ description: Wrapper for libsystemd
 authors:
   - Carl Hörberg <carl@84codes.com>
 
-crystal: 0.35.1
+crystal: ">=0.35.1"
 
 license: MIT
