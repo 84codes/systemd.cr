@@ -6,9 +6,8 @@ describe SystemD do
     sock = Socket.unix(Socket::Type::DGRAM)
     sock.bind Socket::UNIXAddress.new(path)
     SystemD.notify_ready.should be_true
-    # bug in crystal 0.35.1 doesn't allow receiving dgrams over unix socket
-    # message, _ = sock.receive
-    # message.should eq "READY=1\n"
+    message, _ = sock.receive
+    message.should eq "READY=1\n"
     sock.close
     File.delete path
   end
