@@ -1,4 +1,5 @@
 require "./libsystemd"
+require "socket"
 
 # Wrapper for libsystemd
 # http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
@@ -31,6 +32,18 @@ module SystemD
       res = LibSystemD.sd_notify(0, message)
       raise Error.new if res < 0
       res > 0
+    {% elsif flag?(:linux) %}
+      if path = ENV["NOTIFY_SOCKET"]?
+        sock = Socket.unix(Socket::Type::DGRAM)
+        begin
+          sock.send(message, to: Socket::UNIXAddress.new(path))
+        ensure
+          sock.close
+        end
+        true
+      else
+        false
+      end
     {% else %}
       false
     {% end %}
@@ -131,10 +144,32 @@ module SystemD
       res = LibSystemD.sd_is_socket(fd, family, type, listening)
       raise Error.new if res < 0
       res > 0
+    {% elsif flag?(:linux) %}
+      l = getsockopts(fd, LibC::SO_ACCEPTCONN, 0)
+      l == listening || return false
+      t = getsockopts(fd, LibC::SO_TYPE, 0)
+      Socket::Type.new(t) == type || return false
+      f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+      family.includes? Socket::Family.new(f.to_u16) || return false
     {% else %}
       false
     {% end %}
   end
 
+  private def self.getsockopts(fd, optname, optval, level = LibC::SOL_SOCKET)
+    optsize = LibC::SocklenT.new(sizeof(typeof(optval)))
+    ret = LibC.getsockopt(fd, level, optname, pointerof(optval), pointerof(optsize))
+    raise Socket::Error.from_errno("getsockopt") if ret == -1
+    optval
+  end
+
   class Error < Exception; end
+end
+
+lib LibC
+  {% if flag?(:linux) %}
+    SO_TYPE = 3
+    SO_ACCEPTCONN = 30
+    SO_DOMAIN = 39
+  {% end %}
 end
