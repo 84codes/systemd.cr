@@ -135,12 +135,24 @@ module SystemD
       raise Error.new if res < 0
       res > 0
     {% elsif flag?(:linux) %}
-      l = getsockopts(fd, LibC::SO_ACCEPTCONN, 0)
-      l == listening || return false
-      t = getsockopts(fd, LibC::SO_TYPE, 0)
-      Socket::Type.new(t) == type || return false
       f = getsockopts(fd, LibC::SO_DOMAIN, 0)
       family.includes? Socket::Family.new(f.to_u16) || return false
+
+      t = getsockopts(fd, LibC::SO_TYPE, 0)
+      type == Socket::Type.new(t) || return false
+
+      if type == Socket::Type::STREAM
+        l = getsockopts(fd, LibC::SO_ACCEPTCONN, 0)
+        l == listening
+      else
+        sockaddr = Pointer(LibC::Sockaddr).null
+        addrlen = 0u32
+        if LibC.getpeername(fd, sockaddr, pointerof(addrlen)) == 0
+          listening == 0
+        else # getpeername failed, which means it's not connected to a remote, ie listening
+          listening == 1
+        end
+      end
     {% else %}
       false
     {% end %}
