@@ -5,8 +5,6 @@ require "socket"
 # http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
 # http://man7.org/linux/man-pages/man3/sd_listen_fds_with_names.3.html
 module SystemD
-  LISTEN_FDS_START = LibSystemD::SD_LISTEN_FDS_START
-
   def self.notify_ready
     self.notify("READY=1\n")
   end
@@ -28,32 +26,24 @@ module SystemD
   end
 
   def self.notify(message = "READY=1\n") : Bool
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
-      res = LibSystemD.sd_notify(0, message)
-      raise Error.new if res < 0
-      res > 0
-    {% elsif flag?(:linux) %}
-      if path = ENV["NOTIFY_SOCKET"]?
-        sock = Socket.unix(Socket::Type::DGRAM)
-        begin
-          sock.send(message, to: Socket::UNIXAddress.new(path))
-        ensure
-          sock.close
-        end
-        true
-      else
-        false
+    if path = ENV["NOTIFY_SOCKET"]?
+      sock = Socket.unix(Socket::Type::DGRAM)
+      begin
+        sock.send(message, to: Socket::UNIXAddress.new(path))
+      ensure
+        sock.close
       end
-    {% else %}
+      true
+    else
       false
-    {% end %}
+    end
   end
 
   def self.listen_fds
     {% if flag?(:linux) && !flag?(:without_systemd) %}
       fds = LibSystemD.sd_listen_fds(0)
       raise Error.new if fds < 0
-      Array(Int32).new(fds) { |i| LISTEN_FDS_START + i }
+      Array(Int32).new(fds) { |i| LibSystemD::SD_LISTEN_FDS_START + i }
     {% else %}
       Array(Int32).new(0)
     {% end %}
@@ -69,7 +59,7 @@ module SystemD
         ptr = (arr + i).value
         name = String.new(ptr)
         LibC.free ptr
-        { i + LISTEN_FDS_START, name }
+        { i + LibSystemD::SD_LISTEN_FDS_START, name }
       end
       LibC.free arr if fds > 0
       names
