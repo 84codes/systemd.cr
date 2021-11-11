@@ -134,44 +134,10 @@ module SystemD
       res = LibSystemD.sd_is_socket(fd, family, type, listening)
       raise Error.new if res < 0
       res > 0
-    {% elsif flag?(:linux) %}
-      f = getsockopts(fd, LibC::SO_DOMAIN, 0)
-      family.includes? Socket::Family.new(f.to_u16) || return false
-
-      t = getsockopts(fd, LibC::SO_TYPE, 0)
-      type == Socket::Type.new(t) || return false
-
-      if type == Socket::Type::STREAM
-        l = getsockopts(fd, LibC::SO_ACCEPTCONN, 0)
-        l == listening
-      else
-        sockaddr = Pointer(LibC::Sockaddr).null
-        addrlen = 0u32
-        if LibC.getpeername(fd, sockaddr, pointerof(addrlen)) == 0
-          listening == 0
-        else # getpeername failed, which means it's not connected to a remote, ie listening
-          listening == 1
-        end
-      end
     {% else %}
       false
     {% end %}
   end
 
-  private def self.getsockopts(fd, optname, optval, level = LibC::SOL_SOCKET)
-    optsize = LibC::SocklenT.new(sizeof(typeof(optval)))
-    ret = LibC.getsockopt(fd, level, optname, pointerof(optval), pointerof(optsize))
-    raise Socket::Error.from_errno("getsockopt") if ret == -1
-    optval
-  end
-
   class Error < Exception; end
-end
-
-lib LibC
-  {% if flag?(:linux) %}
-    SO_TYPE = 3
-    SO_ACCEPTCONN = 30
-    SO_DOMAIN = 39
-  {% end %}
 end
