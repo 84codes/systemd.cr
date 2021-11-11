@@ -40,7 +40,7 @@ module SystemD
   end
 
   def self.listen_fds
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
+    {% if flag?(:linux) %}
       fds = LibSystemD.sd_listen_fds(0)
       raise Error.new if fds < 0
       Array(Int32).new(fds) { |i| LibSystemD::SD_LISTEN_FDS_START + i }
@@ -50,7 +50,7 @@ module SystemD
   end
 
   def self.listen_fds_with_names
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
+    {% if flag?(:linux) %}
       val = Pointer(UInt8).null
       arr = pointerof(val)
       fds = LibSystemD.sd_listen_fds_with_names(0, pointerof(arr))
@@ -69,7 +69,7 @@ module SystemD
   end
 
   def self.store_fds(fds : Array(Int32)) : Bool
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
+    {% if flag?(:linux) %}
       res = LibSystemD.sd_pid_notify_with_fds(0, 0, "FDSTORE=1\n",
                                               fds.to_unsafe, fds.size)
       raise Error.new if res < 0
@@ -80,7 +80,7 @@ module SystemD
   end
 
   def self.store_fds(fds : Array(Int32), name : String) : Bool
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
+    {% if flag?(:linux) %}
       res = LibSystemD.sd_pid_notify_with_fds(0, 0,
                                               "FDSTORE=1\nFDNAME=#{name}\n",
                                               fds.to_unsafe, fds.size)
@@ -130,7 +130,7 @@ module SystemD
   # Checks if a FD refers to a socket of the specified type
   # https://www.man7.org/linux/man-pages/man3/sd_is_socket_unix.3.html
   def self.is_socket?(fd : Int, family : Socket::Family, type : Socket::Type, listening : Int) : Bool
-    {% if flag?(:linux) && !flag?(:without_systemd) %}
+    {% if flag?(:linux) %}
       res = LibSystemD.sd_is_socket(fd, family, type, listening)
       raise Error.new if res < 0
       res > 0
