@@ -39,39 +39,31 @@ module SystemD
     end
   end
 
-  def self.listen_fds
-    {% if flag?(:linux) %}
-      fds = LibSystemD.sd_listen_fds(0)
-      raise Error.new if fds < 0
-      Array(Int32).new(fds) { |i| LibSystemD::SD_LISTEN_FDS_START + i }
-    {% else %}
+  LISTEN_FDS_START = 3
+
+  def self.listen_fds : Indexable(Int32)
+    if Process.pid == ENV.fetch("LISTEN_PID", "").to_i?
+      fds = ENV.fetch("LISTEN_FDS", "0").to_i
+      Array(Int32).new(fds) { |i| LISTEN_FDS_START + i }
+    else
       Array(Int32).new(0)
-    {% end %}
+    end
   end
 
-  def self.listen_fds_with_names
-    {% if flag?(:linux) %}
-      val = Pointer(UInt8).null
-      arr = pointerof(val)
-      fds = LibSystemD.sd_listen_fds_with_names(0, pointerof(arr))
-      raise Error.new if fds < 0
-      names = Array(Tuple(Int32, String)).new(fds) do |i|
-        ptr = (arr + i).value
-        name = String.new(ptr)
-        LibC.free ptr
-        { i + LibSystemD::SD_LISTEN_FDS_START, name }
+  def self.listen_fds_with_names : Indexable(Tuple(Int32, String))
+    if Process.pid == ENV.fetch("LISTEN_PID", "").to_i?
+      ENV.fetch("LISTEN_FDNAMES", "").split(":").map_with_index do |name, i|
+        {LISTEN_FDS_START + i, name}
       end
-      LibC.free arr if fds > 0
-      names
-    {% else %}
+    else
       Array(Tuple(Int32, String)).new(0)
-    {% end %}
+    end
   end
 
   def self.store_fds(fds : Array(Int32)) : Bool
     {% if flag?(:linux) %}
       res = LibSystemD.sd_pid_notify_with_fds(0, 0, "FDSTORE=1\n",
-                                              fds.to_unsafe, fds.size)
+        fds.to_unsafe, fds.size)
       raise Error.new if res < 0
       res > 0
     {% else %}
@@ -81,9 +73,7 @@ module SystemD
 
   def self.store_fds(fds : Array(Int32), name : String) : Bool
     {% if flag?(:linux) %}
-      res = LibSystemD.sd_pid_notify_with_fds(0, 0,
-                                              "FDSTORE=1\nFDNAME=#{name}\n",
-                                              fds.to_unsafe, fds.size)
+      res = LibSystemD.sd_pid_notify_with_fds(0, 0, "FDSTORE=1\nFDNAME=#{name}\n", fds.to_unsafe, fds.size)
       raise Error.new if res < 0
       res > 0
     {% else %}

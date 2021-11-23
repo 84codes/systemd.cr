@@ -12,18 +12,16 @@ describe SystemD do
     File.delete path
   end
 
-  {% unless flag?(:without_systemd) %}
-    it "can get listen fds" do
-      ENV["LISTEN_FDS"] = "2"
-      SystemD.listen_fds.should eq [3, 4]
-    end
+  it "can get listen fds" do
+    ENV["LISTEN_FDS"] = "2"
+    SystemD.listen_fds.should eq [3, 4]
+  end
 
-    it "can get listen fds with names" do
-      ENV["LISTEN_FDS"] = "2"
-      ENV["LISTEN_FDNAMES"] = "echo.socket:stored"
-      SystemD.listen_fds_with_names.should eq [{ 3, "echo.socket" }, { 4, "stored" }]
-    end
-  {% end %}
+  it "can get listen fds with names" do
+    ENV["LISTEN_FDS"] = "2"
+    ENV["LISTEN_FDNAMES"] = "echo.socket:stored"
+    SystemD.listen_fds_with_names.should eq [{3, "echo.socket"}, {4, "stored"}]
+  end
 
   it "can identify tcp listerner sockets" do
     TCPServer.open("localhost", 0) do |s|

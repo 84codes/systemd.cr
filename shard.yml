@@ -5,6 +5,11 @@ description: Wrapper for libsystemd
 authors:
   - Carl Hörberg <carl@84codes.com>
 
+libraries:
+  libsystemd: "*"
+
+repository: "https://github.com/84codes/systemd.cr"
+
 crystal: ">=0.35.1"
 
 license: MIT

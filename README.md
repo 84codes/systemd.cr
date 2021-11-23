@@ -1,6 +1,8 @@
 # SystemD
 
-libsystemd wrapper for Crystal.
+SystemD integration for Crystal applications, can notify systemd, get socket listeners and store/restore file descriptors.
+
+libsystemd is required for transferring FDs, but not for notifying or getting listeners.
 
 Detailed information:
 
