@@ -1,16 +1,11 @@
 # SystemD
 
-SystemD integration for Crystal applications, can notify systemd, get socket listeners and store/restore file descriptors.
+SystemD integration for Crystal applications, can notify systemd, get socket listeners and store/restore file descriptors. libsystemd is only required for storing FDs.
 
-libsystemd is required for transferring FDs, but not for notifying or getting listeners.
+Man pages:
 
-Detailed information:
-
-http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
-
-http://man7.org/linux/man-pages/man3/sd_listen_fds_with_names.3.html
-
-No-op for non Linux systems.
+https://man7.org/linux/man-pages/man3/sd_pid_notify.3.html
+https://man7.org/linux/man-pages/man3/sd_listen_fds.3.html
 
 ## Installation
 
@@ -35,26 +30,26 @@ SystemD.notify_ready
 # Update the status
 SystemD.notify_status("Accepting connections")
 
-SystemD.listen_fds.each do |fd|
-  server = TCPServer.new(fd: fd)
-  ...
-end
-
-# Store FDs with the SystemD, they will be sent back
-# to the application when it restarts
-clients = Array(TCPSocket).new
-SystemD.store_fds(clients.map &.fd)
-
-SystemD.listen_fds_with_names.each do |fd, name|
+# Retrive store FDs
+SystemD.named_listeners do |socket, name|
   case name
-  when /\.socket$/
-    server = TCPServer.new(fd: fd)
-    ...
-  when "stored"
-    client = TCPSocket.new(fd: fd)
+  when .ends_with?(".socket")
+    spawn do
+      while client = socket.accept?
+        spawn handle_client(client)
+      end
+    end
+  when "stored" # stored FD without name
+    @connections << socket
+  else
     ...
   end
 end
+
+# Store FDs with the SystemD, they will be sent back
+# to the application when it restarts. Requires libsystemd
+clients = Array(TCPSocket).new
+SystemD.store_fds(clients.map &.fd)
 ```
 
 ## Contributing
