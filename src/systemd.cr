@@ -121,13 +121,92 @@ module SystemD
   # https://www.man7.org/linux/man-pages/man3/sd_is_socket_unix.3.html
   def self.is_socket?(fd : Int, family : Socket::Family, type : Socket::Type, listening : Int) : Bool
     {% if flag?(:linux) %}
-      res = LibSystemD.sd_is_socket(fd, family, type, listening)
-      raise Error.new if res < 0
-      res > 0
+      f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+      family.includes?(Socket::Family.new(f.to_u16)) || return false
+
+      t = getsockopts(fd, LibC::SO_TYPE, 0)
+      type == Socket::Type.new(t) || return false
+
+      if type == Socket::Type::STREAM
+        l = getsockopts(fd, LibC::SO_ACCEPTCONN, 0)
+        l == listening
+      else
+        sockaddr = Pointer(LibC::Sockaddr).null
+        addrlen = 0u32
+        if LibC.getpeername(fd, sockaddr, pointerof(addrlen)) == 0
+          listening == 0
+        else # getpeername failed, which means it's not connected to a remote, ie listening
+          listening == 1
+        end
+      end
     {% else %}
       false
     {% end %}
   end
 
+  def self.listening_socket?(fd : Int)
+    t = getsockopts(fd, LibC::SO_TYPE, 0)
+    type = Socket::Type.new(t)
+    case type
+    when Socket::Type::STREAM
+      getsockopts(fd, LibC::SO_ACCEPTCONN, 0) == listening
+    else
+      sockaddr = Pointer(LibC::Sockaddr).null
+      addrlen = 0u32
+      if LibC.getpeername(fd, sockaddr, pointerof(addrlen)) == 0
+        listening == 0
+      else
+        listening == 1
+      end
+    end
+  end
+
+  def self.tcp_socket?(fd : Int)
+    t = getsockopts(fd, LibC::SO_TYPE, 0)
+    Socket::Type.new(t) == Socket::Type::STREAM || return false
+
+    f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+    (Socket::Family::INET | Socket::Family::INET6).includes? Socket::Family.new(f.to_u16)
+  end
+
+  def self.udp_socket?(fd : Int)
+    t = getsockopts(fd, LibC::SO_TYPE, 0)
+    Socket::Type.new(t) == Socket::Type::DGRAM || return false
+
+    f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+    (Socket::Family::INET | Socket::Family::INET6).includes? Socket::Family.new(f.to_u16)
+  end
+
+  def self.unix_stream_socket?(fd : Int)
+    t = getsockopts(fd, LibC::SO_TYPE, 0)
+    Socket::Type.new(t) == Socket::Type::STREAM || return false
+
+    f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+    Socket::Family.new(f.to_u16) == Socket::Family::UNIX
+  end
+
+  def self.unix_dgram_socket?(fd : Int)
+    t = getsockopts(fd, LibC::SO_TYPE, 0)
+    Socket::Type.new(t) == Socket::Type::DGRAM || return false
+
+    f = getsockopts(fd, LibC::SO_DOMAIN, 0)
+    Socket::Family.new(f.to_u16) == Socket::Family::UNIX
+  end
+
+  private def self.getsockopts(fd, optname, optval, level = LibC::SOL_SOCKET)
+    optsize = LibC::SocklenT.new(sizeof(typeof(optval)))
+    ret = LibC.getsockopt(fd, level, optname, pointerof(optval), pointerof(optsize))
+    raise Socket::Error.from_errno("getsockopt") if ret == -1
+    optval
+  end
+
   class Error < Exception; end
+end
+
+lib LibC
+  {% if flag?(:linux) %}
+    SO_TYPE       =  3
+    SO_ACCEPTCONN = 30
+    SO_DOMAIN     = 39
+  {% end %}
 end
