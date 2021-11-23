@@ -71,12 +71,9 @@ module SystemD
   end
 
   def self.listen_fds_with_names : Indexable(Tuple(Int32, String))
-    if Process.pid == ENV.fetch("LISTEN_PID", "").to_i?
-      ENV.fetch("LISTEN_FDNAMES", "").split(":").map_with_index do |name, i|
-        {LISTEN_FDS_START + i, name}
-      end
-    else
-      Array(Tuple(Int32, String)).new(0)
+    names = ENV.fetch("LISTEN_FDNAMES", "").split(":")
+    listen_fds.map_with_index do |fd, i|
+      {fd, names[i]? || "unknown"}
     end
   end
 
