@@ -50,6 +50,26 @@ module SystemD
     end
   end
 
+  def self.listeners : Indexable(Socket)
+    listen_fds.map do |fd|
+      family = Socket::Family.new(getsockopts(fd, LibC::SO_DOMAIN, 0).to_u16)
+      type = Socket::Type.new(getsockopts(fd, LibC::SO_TYPE, 0))
+      Socket.new(fd: fd, family: family, type: type)
+    end
+  end
+
+  def self.named_listeners : Indexable(Tuple(Socket, String))
+    listen_fds_with_names.map do |fd, name|
+      family = Socket::Family.new(getsockopts(fd, LibC::SO_DOMAIN, 0).to_u16)
+      type = Socket::Type.new(getsockopts(fd, LibC::SO_TYPE, 0))
+      {Socket.new(fd: fd, family: family, type: type), name}
+    end
+  end
+
+  def self.is_listening?(fd)
+    getsockopts(fd, LibC::SO_ACCEPTCONN, 0) == 1
+  end
+
   def self.listen_fds_with_names : Indexable(Tuple(Int32, String))
     if Process.pid == ENV.fetch("LISTEN_PID", "").to_i?
       ENV.fetch("LISTEN_FDNAMES", "").split(":").map_with_index do |name, i|
