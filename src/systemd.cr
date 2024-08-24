@@ -21,8 +21,26 @@ module SystemD
     self.notify("STATUS=#{status}\n")
   end
 
-  def self.watchdog
-    self.notify("WATCHDOG=1\n")
+  def self.start_watchdog
+    interval = self.watchdog_interval? || return
+    interval = interval / 2
+    path = ENV["NOTIFY_SOCKET"]? || return
+    sock = UNIXSocket.new(path, Socket::Type::DGRAM)
+    spawn do
+      loop do
+        sleep interval
+        sock.send("WATCHDOG=1\n")
+      end
+    end
+  end
+
+  def self.watchdog_interval? : Time::Span?
+    if wpid = ENV.fetch("WATCHDOG_PID", "").to_i?
+      return unless wpid == Process.pid
+    end
+    if usec = ENV.fetch("WATCHDOG_USEC", "").to_u64?
+      return usec.microsecond
+    end
   end
 
   def self.notify(message = "READY=1\n") : Bool
