@@ -52,4 +52,20 @@ describe SystemD do
     c.close
     s.close
   end
+
+  it "can send watchdog keepalives" do
+    ENV["WATCHDOG_USEC"] = "100"
+    ENV["NOTIFY_SOCKET"] = path = File.tempname
+    begin
+      sock = Socket.unix(Socket::Type::DGRAM)
+      sock.bind Socket::UNIXAddress.new(path)
+
+      SystemD.start_watchdog
+
+      message, _ = sock.receive
+      message.should eq "WATCHDOG=1\n"
+    ensure
+      File.delete path
+    end
+  end
 end
