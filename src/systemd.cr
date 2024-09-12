@@ -21,17 +21,27 @@ module SystemD
     self.notify("STATUS=#{status}\n")
   end
 
-  def self.start_watchdog
+  # Report to systemd in a separate fiber
+  # If the *callback* returns false the will be executed every time, return true if your check is ok.
+  # If systemd doesn't get a ping every `WATCHDOG_USEC` it will kill the process.
+  # This method can always be called, if watchdog isn't enabled in systemd or
+  # the process is not running under systemd it will do nothing.
+  def self.start_watchdog(&callback : -> _)
+    sock_path = ENV["NOTIFY_SOCKET"]? || return
     interval = self.watchdog_interval? || return
     interval = interval / 2
-    path = ENV["NOTIFY_SOCKET"]? || return
-    sock = UNIXSocket.new(path, Socket::Type::DGRAM)
-    spawn do
+    spawn(name: "SystemD Watchdog") do
+      sock = UNIXSocket.new(sock_path, Socket::Type::DGRAM)
       loop do
         sleep interval
+        callback.call || break
         sock.send("WATCHDOG=1\n")
       end
     end
+  end
+
+  def self.start_watchdog
+    self.start_watchdog { true }
   end
 
   def self.watchdog_interval? : Time::Span?
