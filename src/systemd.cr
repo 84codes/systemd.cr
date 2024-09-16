@@ -22,7 +22,7 @@ module SystemD
   end
 
   # Report to systemd in a separate fiber
-  # If the *callback* returns false the will be executed every time, return true if your check is ok.
+  # The *callback* should return a trueish value or else the keepalive won't be sent
   # If systemd doesn't get a ping every `WATCHDOG_USEC` it will kill the process.
   # This method can always be called, if watchdog isn't enabled in systemd or
   # the process is not running under systemd it will do nothing.
