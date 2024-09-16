@@ -14,7 +14,8 @@ module SystemD
   end
 
   def self.notify_reloading
-    self.notify("RELOADING=1\n")
+    usec = Time.monotonic.total_microseconds.to_u64
+    self.notify("RELOADING=1\nMONOTONIC_USEC=#{usec}\n")
   end
 
   def self.notify_status(status : String)
