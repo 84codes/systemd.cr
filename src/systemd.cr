@@ -1,5 +1,7 @@
-require "./libsystemd"
 require "socket"
+{% if flag?(:linux) %}
+  require "./libsystemd"
+{% end %}
 
 # Wrapper for libsystemd
 # http://man7.org/linux/man-pages/man3/sd_pid_notify_with_fds.3.html
