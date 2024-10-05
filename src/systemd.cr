@@ -26,7 +26,7 @@ module SystemD
   # If systemd doesn't get a ping every `WATCHDOG_USEC` it will kill the process.
   # This method can always be called, if watchdog isn't enabled in systemd or
   # the process is not running under systemd it will do nothing.
-  def self.start_watchdog(&callback : -> _)
+  def self.watchdog(&callback : -> _)
     sock_path = ENV["NOTIFY_SOCKET"]? || return
     interval = self.watchdog_interval? || return
     interval = interval / 2
@@ -40,7 +40,7 @@ module SystemD
     end
   end
 
-  def self.start_watchdog
+  def self.watchdog
     self.start_watchdog { true }
   end
 
