@@ -60,7 +60,7 @@ describe SystemD do
       sock = Socket.unix(Socket::Type::DGRAM)
       sock.bind Socket::UNIXAddress.new(path)
 
-      SystemD.start_watchdog
+      SystemD.watchdog
 
       message, _ = sock.receive
       message.should eq "WATCHDOG=1\n"

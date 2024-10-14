@@ -44,7 +44,7 @@ module SystemD
   end
 
   def self.watchdog
-    self.start_watchdog { true }
+    self.watchdog { true }
   end
 
   def self.watchdog_interval? : Time::Span?
