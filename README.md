@@ -30,6 +30,22 @@ SystemD.notify_ready
 # Update the status
 SystemD.notify_status("Accepting connections")
 
+# When reloading
+Signal::HUP.trap do
+  SystemD.notify_reloading
+  # reload
+  SystemD.notify_ready
+end
+
+# Starts a watchdog fiber that will report to systemd that the app is ok
+# Enable systemd watchdog support with `WatchdogSec=5` under `[Service]`
+SystemD.watchdog
+
+# Store FDs with the SystemD, they will be sent back
+# to the application when it restarts. Requires libsystemd
+clients = Array(TCPSocket).new
+SystemD.store_fds(clients.map &.fd)
+
 # Retrive store FDs
 SystemD.named_listeners do |socket, name|
   case name
@@ -45,11 +61,6 @@ SystemD.named_listeners do |socket, name|
     ...
   end
 end
-
-# Store FDs with the SystemD, they will be sent back
-# to the application when it restarts. Requires libsystemd
-clients = Array(TCPSocket).new
-SystemD.store_fds(clients.map &.fd)
 ```
 
 ## Contributing
