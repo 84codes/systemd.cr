@@ -1,11 +1,12 @@
 # SystemD
 
-SystemD integration for Crystal applications, can notify systemd, get socket listeners and store/restore file descriptors. libsystemd is only required for storing FDs.
+SystemD integration for Crystal applications, can notify systemd, get socket listeners, store/restore file descriptors, and monitor memory pressure. libsystemd is only required for storing FDs.
 
 Man pages:
 
 https://man7.org/linux/man-pages/man3/sd_pid_notify.3.html
 https://man7.org/linux/man-pages/man3/sd_listen_fds.3.html
+https://systemd.io/MEMORY_PRESSURE/
 
 ## Installation
 
@@ -40,6 +41,14 @@ end
 # Starts a watchdog fiber that will report to systemd that the app is ok
 # Enable systemd watchdog support with `WatchdogSec=5` under `[Service]`
 SystemD.watchdog
+
+# Monitor memory pressure notifications from systemd
+# Enable with `MemoryPressureWatch=auto` and `MemoryPressureThresholdSec=1s` under `[Service]`
+SystemD::MemoryPressure.monitor do
+  # Called when memory pressure is detected
+  # Take action like clearing caches, reducing memory usage, etc.
+  clear_caches
+end
 
 # Store FDs with the SystemD, they will be sent back
 # to the application when it restarts. Requires libsystemd
