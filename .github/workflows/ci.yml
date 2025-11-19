@@ -26,4 +26,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Spec
-        run: crystal spec
+        run: crystal spec -Dpreview_mt -Dexecution_context
