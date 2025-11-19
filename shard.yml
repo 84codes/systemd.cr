@@ -1,6 +1,6 @@
 name: systemd
-version: 2.0.0
-description: Wrapper for libsystemd
+version: 3.0.0
+description: SystemD integration
 
 authors:
   - Carl Hörberg <carl@84codes.com>
