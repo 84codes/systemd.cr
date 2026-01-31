@@ -8,8 +8,13 @@ lib LibC
     revents : Short
   end
 
-  POLLIN  = 0x0001
-  POLLPRI = 0x0002
+  {% unless LibC.has_constant?(:POLLIN) %}
+    POLLIN = 0x0001
+  {% end %}
+
+  {% unless LibC.has_constant?(:POLLPRI) %}
+    POLLPRI = 0x0002
+  {% end %}
 
   fun poll(fds : PollFD*, nfds : UInt, timeout : Int) : Int
 end
