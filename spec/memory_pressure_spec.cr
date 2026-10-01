@@ -206,9 +206,7 @@ describe SystemD::MemoryPressure do
       end
 
       sleep 100.milliseconds
-      # the written notification, plus the event a FIFO reports at startup
-      calls.get.should be <= 2
-      calls.get.should be >= 1
+      calls.get.should eq 1
     ensure
       File.delete(fifo_path) if File.exists?(fifo_path)
       ENV.delete("MEMORY_PRESSURE_WATCH")
