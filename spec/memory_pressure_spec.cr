@@ -35,7 +35,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       wg = WaitGroup.new(1)
-      SystemD::MemoryPressure.monitor { |pressure| wg.done if pressure }
+      SystemD::MemoryPressure.monitor { wg.done }
 
       # Write to the FIFO to trigger memory pressure
       File.open(fifo_path, "w") do |f|
@@ -61,7 +61,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       ch = Channel(Nil).new
-      SystemD::MemoryPressure.monitor { |pressure| ch.send(nil) if pressure }
+      SystemD::MemoryPressure.monitor { ch.send(nil) }
 
       # Accept the connection and send data
       client = server.accept
@@ -90,7 +90,7 @@ describe SystemD::MemoryPressure do
       ENV["MEMORY_PRESSURE_WRITE"] = Base64.strict_encode(write_data)
 
       ch = Channel(Nil).new
-      SystemD::MemoryPressure.monitor { |pressure| ch.send(nil) if pressure }
+      SystemD::MemoryPressure.monitor { ch.send(nil) }
 
       # Accept the connection and read the threshold data
       client = server.accept
@@ -124,7 +124,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       call_count = 0
-      SystemD::MemoryPressure.monitor { |pressure| call_count += 1 if pressure }
+      SystemD::MemoryPressure.monitor { call_count += 1 }
 
       # Accept first connection and trigger pressure
       client1 = server.accept
@@ -190,7 +190,32 @@ describe SystemD::MemoryPressure do
     File.delete?(path) if path
   end
 
-  it "calls on_relief once pressure drops below the threshold" do
+  it "monitor only calls the block on pressure" do
+    fifo_path = File.tempname
+    begin
+      LibC.mkfifo(fifo_path, 0o600).should eq 0
+      ENV["MEMORY_PRESSURE_WATCH"] = fifo_path
+      ENV.delete("MEMORY_PRESSURE_WRITE")
+
+      calls = Atomic(Int32).new(0)
+      SystemD::MemoryPressure.monitor { calls.add(1) }
+
+      File.open(fifo_path, "w") do |f|
+        f.sync = true
+        f.print "pressure"
+      end
+
+      sleep 100.milliseconds
+      # the written notification, plus the event a FIFO reports at startup
+      calls.get.should be <= 2
+      calls.get.should be >= 1
+    ensure
+      File.delete(fifo_path) if File.exists?(fifo_path)
+      ENV.delete("MEMORY_PRESSURE_WATCH")
+    end
+  end
+
+  it "watch signals relief once pressure drops below the threshold" do
     fifo_path = File.tempname
     begin
       LibC.mkfifo(fifo_path, 0o600).should eq 0
@@ -199,7 +224,7 @@ describe SystemD::MemoryPressure do
 
       pressured = Channel(Nil).new(1)
       relieved = Channel(Nil).new(1)
-      SystemD::MemoryPressure.monitor(Float64::MAX, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
+      SystemD::MemoryPressure.watch(Float64::MAX, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
 
       File.open(fifo_path, "w") do |f|
         f.sync = true
@@ -210,7 +235,7 @@ describe SystemD::MemoryPressure do
       select
       when relieved.receive
       when timeout(5.seconds)
-        fail "on_relief was not called"
+        fail "relief was not signalled"
       end
     ensure
       File.delete(fifo_path) if File.exists?(fifo_path)
@@ -218,7 +243,7 @@ describe SystemD::MemoryPressure do
     end
   end
 
-  it "does not call on_relief while pressure persists" do
+  it "watch does not signal relief while pressure persists" do
     pending! "no PSI" unless File.file?("/proc/pressure/memory")
     fifo_path = File.tempname
     begin
@@ -228,7 +253,7 @@ describe SystemD::MemoryPressure do
 
       pressured = Channel(Nil).new(1)
       relieved = Channel(Nil).new(1)
-      SystemD::MemoryPressure.monitor(0.0, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
+      SystemD::MemoryPressure.watch(0.0, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
 
       File.open(fifo_path, "w") do |f|
         f.sync = true
@@ -238,7 +263,7 @@ describe SystemD::MemoryPressure do
       pressured.receive
       select
       when relieved.receive
-        fail "on_relief called while under pressure"
+        fail "relief signalled while under pressure"
       when timeout(200.milliseconds)
       end
     ensure

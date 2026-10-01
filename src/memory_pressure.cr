@@ -30,14 +30,23 @@ module SystemD
     # Pressure stall information, `full` is missing on older kernels
     record Pressure, some : Stall, full : Stall?
 
+    # The block is called when memory pressure is detected
+    def self.monitor(&block : ->)
+      start(nil, Time::Span.zero, ->(pressure : Bool) { block.call if pressure })
+    end
+
     # The block is called with `true` when memory pressure is detected and
     # with `false` when it is relieved. Notifications only signal the onset,
     # so while under pressure the PSI file is polled every *check_interval*
     # and relief is signalled once its "some avg10" drops below
     # *release_below* (percent), or at the first check if no PSI file can be
     # read.
-    def self.monitor(release_below : Float64 = 1.0, check_interval : Time::Span = 1.second,
-                     &block : Bool ->)
+    def self.watch(release_below : Float64 = 1.0, check_interval : Time::Span = 1.second,
+                   &block : Bool ->)
+      start(release_below, check_interval, block)
+    end
+
+    private def self.start(release_below : Float64?, check_interval : Time::Span, block : Bool ->)
       watch_path = ENV["MEMORY_PRESSURE_WATCH"]?
       return unless watch_path
 
@@ -129,7 +138,7 @@ module SystemD
       @fd : Int32
       @under_pressure = false
 
-      def initialize(@path : String, @write_data : Bytes?, @release_below : Float64,
+      def initialize(@path : String, @write_data : Bytes?, @release_below : Float64?,
                      @check_interval : Time::Span, @callback : Bool ->)
         @kind = determine_kind(@path)
         Log.info { "Monitoring memory pressure on #{@kind.to_s.downcase}: #{@path}" }
@@ -159,12 +168,13 @@ module SystemD
       end
 
       private def timeout : Int32
-        @under_pressure ? @check_interval.total_milliseconds.to_i : -1
+        @under_pressure && @release_below ? @check_interval.total_milliseconds.to_i : -1
       end
 
       private def check_relief
+        release_below = @release_below || return
         avg10 = (path = MemoryPressure.pressure_path) && MemoryPressure.pressure(path).try &.some.avg10
-        return if avg10 && avg10 >= @release_below
+        return if avg10 && avg10 >= release_below
         @under_pressure = false
         Log.info { "Memory pressure relieved" }
         @callback.call(false)
