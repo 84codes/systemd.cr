@@ -35,7 +35,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       wg = WaitGroup.new(1)
-      SystemD::MemoryPressure.monitor { wg.done }
+      SystemD::MemoryPressure.monitor { |pressure| wg.done if pressure }
 
       # Write to the FIFO to trigger memory pressure
       File.open(fifo_path, "w") do |f|
@@ -61,7 +61,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       ch = Channel(Nil).new
-      SystemD::MemoryPressure.monitor { ch.send(nil) }
+      SystemD::MemoryPressure.monitor { |pressure| ch.send(nil) if pressure }
 
       # Accept the connection and send data
       client = server.accept
@@ -90,7 +90,7 @@ describe SystemD::MemoryPressure do
       ENV["MEMORY_PRESSURE_WRITE"] = Base64.strict_encode(write_data)
 
       ch = Channel(Nil).new
-      SystemD::MemoryPressure.monitor { ch.send(nil) }
+      SystemD::MemoryPressure.monitor { |pressure| ch.send(nil) if pressure }
 
       # Accept the connection and read the threshold data
       client = server.accept
@@ -124,7 +124,7 @@ describe SystemD::MemoryPressure do
       ENV.delete("MEMORY_PRESSURE_WRITE")
 
       call_count = 0
-      SystemD::MemoryPressure.monitor { call_count += 1 }
+      SystemD::MemoryPressure.monitor { |pressure| call_count += 1 if pressure }
 
       # Accept first connection and trigger pressure
       client1 = server.accept
@@ -149,6 +149,100 @@ describe SystemD::MemoryPressure do
       server.close
     ensure
       File.delete(socket_path) if File.exists?(socket_path)
+      ENV.delete("MEMORY_PRESSURE_WATCH")
+    end
+  end
+
+  it "parses PSI data" do
+    data = "some avg10=1.50 avg60=0.25 avg300=0.00 total=12345\nfull avg10=0.75 avg60=0.10 avg300=0.00 total=678\n"
+    pressure = SystemD::MemoryPressure.parse(data).should_not be_nil
+    pressure.some.should eq SystemD::MemoryPressure::Stall.new(1.5, 0.25, 0.0, 12345u64)
+    pressure.full.try(&.avg10).should eq 0.75
+  end
+
+  it "parses PSI data without a full line" do
+    pressure = SystemD::MemoryPressure.parse("some avg10=2.00 avg60=1.00 avg300=0.50 total=1\n").should_not be_nil
+    pressure.some.avg10.should eq 2.0
+    pressure.full.should be_nil
+  end
+
+  it "returns nil for malformed PSI data" do
+    SystemD::MemoryPressure.parse("garbage").should be_nil
+    SystemD::MemoryPressure.parse("some avg10=x avg60=1 avg300=1 total=1").should be_nil
+  end
+
+  it "reads pressure from a file" do
+    path = File.tempname
+    File.write(path, "some avg10=3.00 avg60=2.00 avg300=1.00 total=99\n")
+    SystemD::MemoryPressure.pressure(path).try(&.some.total).should eq 99
+    SystemD::MemoryPressure.pressure("/nonexistent/memory.pressure").should be_nil
+  ensure
+    File.delete?(path) if path
+  end
+
+  it "prefers a watched .pressure file" do
+    path = File.tempname(suffix: ".pressure")
+    File.write(path, "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
+    ENV["MEMORY_PRESSURE_WATCH"] = path
+    SystemD::MemoryPressure.pressure_path.should eq path
+  ensure
+    ENV.delete("MEMORY_PRESSURE_WATCH")
+    File.delete?(path) if path
+  end
+
+  it "calls on_relief once pressure drops below the threshold" do
+    fifo_path = File.tempname
+    begin
+      LibC.mkfifo(fifo_path, 0o600).should eq 0
+      ENV["MEMORY_PRESSURE_WATCH"] = fifo_path
+      ENV.delete("MEMORY_PRESSURE_WRITE")
+
+      pressured = Channel(Nil).new(1)
+      relieved = Channel(Nil).new(1)
+      SystemD::MemoryPressure.monitor(Float64::MAX, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
+
+      File.open(fifo_path, "w") do |f|
+        f.sync = true
+        f.print "pressure"
+      end
+
+      pressured.receive
+      select
+      when relieved.receive
+      when timeout(5.seconds)
+        fail "on_relief was not called"
+      end
+    ensure
+      File.delete(fifo_path) if File.exists?(fifo_path)
+      ENV.delete("MEMORY_PRESSURE_WATCH")
+    end
+  end
+
+  it "does not call on_relief while pressure persists" do
+    pending! "no PSI" unless File.file?("/proc/pressure/memory")
+    fifo_path = File.tempname
+    begin
+      LibC.mkfifo(fifo_path, 0o600).should eq 0
+      ENV["MEMORY_PRESSURE_WATCH"] = fifo_path
+      ENV.delete("MEMORY_PRESSURE_WRITE")
+
+      pressured = Channel(Nil).new(1)
+      relieved = Channel(Nil).new(1)
+      SystemD::MemoryPressure.monitor(0.0, 10.milliseconds) { |pressure| pressure ? pressured.send(nil) : relieved.send(nil) }
+
+      File.open(fifo_path, "w") do |f|
+        f.sync = true
+        f.print "pressure"
+      end
+
+      pressured.receive
+      select
+      when relieved.receive
+        fail "on_relief called while under pressure"
+      when timeout(200.milliseconds)
+      end
+    ensure
+      File.delete(fifo_path) if File.exists?(fifo_path)
       ENV.delete("MEMORY_PRESSURE_WATCH")
     end
   end

@@ -44,11 +44,20 @@ SystemD.watchdog
 
 # Monitor memory pressure notifications from systemd
 # Enable with `MemoryPressureWatch=auto` and `MemoryPressureThresholdSec=1s` under `[Service]`
-SystemD::MemoryPressure.monitor do
-  # Called when memory pressure is detected
-  # Take action like clearing caches, reducing memory usage, etc.
-  clear_caches
+# The block is called with true when memory pressure is detected, and with
+# false once the PSI "some avg10" drops below release_below (percent)
+SystemD::MemoryPressure.monitor(release_below: 1.0) do |pressure|
+  if pressure
+    # Take action like clearing caches, reducing memory usage, etc.
+    clear_caches
+    pause_work
+  else
+    resume_work
+  end
 end
+
+# Read the current pressure stall information (PSI) of the process' cgroup
+SystemD::MemoryPressure.pressure.try &.some.avg10
 
 # Store FDs with the SystemD, they will be sent back
 # to the application when it restarts. Requires libsystemd
